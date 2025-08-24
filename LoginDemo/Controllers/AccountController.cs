@@ -1,71 +1,78 @@
-using Microsoft.AspNetCore.Mvc;
 using LoginDemo.Data;
 using LoginDemo.Models;
 using Microsoft.AspNetCore.Identity;
-using System.Threading.Tasks;
-using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LoginDemo.Controllers
 {
     public class AccountController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly PasswordHasher<string> _hasher = new PasswordHasher<string>();
+        private readonly PasswordHasher<User> _hasher;
 
         public AccountController(AppDbContext context)
         {
             _context = context;
+            _hasher = new PasswordHasher<User>();
         }
 
-        // GET: /Account/Register
+        // GET: Register
         public IActionResult Register() => View();
 
-        // POST: /Account/Register
+        // POST: Register
         [HttpPost]
-        public async Task<IActionResult> Register(string email, string password)
+        public IActionResult Register(string email, string password)
         {
             if (_context.Users.Any(u => u.Email == email))
             {
-                ViewBag.Error = "Email already exists.";
+                ViewBag.Message = "Email already registered";
                 return View();
             }
 
             var user = new User
             {
-                Email = email,
-                PasswordHash = _hasher.HashPassword(null, password)
+                Email = email
             };
+            user.PasswordHash = _hasher.HashPassword(user, password);
 
             _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            _context.SaveChanges();
 
-            return RedirectToAction("Login");
+            ViewBag.Message = "Registration successful. Please login.";
+            return View();
         }
 
-        // GET: /Account/Login
+        // GET: Login
         public IActionResult Login() => View();
 
-        // POST: /Account/Login
+        // POST: Login
         [HttpPost]
         public IActionResult Login(string email, string password)
         {
             var user = _context.Users.FirstOrDefault(u => u.Email == email);
             if (user == null)
             {
-                ViewBag.Error = "Invalid login.";
+                ViewBag.Message = "Invalid login.";
                 return View();
             }
 
-            var result = _hasher.VerifyHashedPassword(null, user.PasswordHash, password);
-            if (result == PasswordVerificationResult.Success)
+            if (string.IsNullOrEmpty(user.PasswordHash))
             {
-                return RedirectToAction("Welcome");
+                ViewBag.Message = "Invalid login.";
+                return View();
             }
 
-            ViewBag.Error = "Invalid login.";
-            return View();
+            var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
+            if (result == PasswordVerificationResult.Success)
+            {
+                // Login successful
+                return RedirectToAction("Index", "Home");
+            }
+            else
+            {
+                ViewBag.Message = "Invalid login.";
+                return View();
+            }
         }
-
-        public IActionResult Welcome() => View();
     }
 }
