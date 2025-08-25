@@ -1,78 +1,78 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 using LoginDemo.Data;
-using LoginDemo.Models;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 
-namespace LoginDemo.Controllers
+public class AccountController : Controller
 {
-    public class AccountController : Controller
+    private readonly AppDbContext _context;
+    private readonly IPasswordHasher<object> _hasher;
+
+    public AccountController(AppDbContext context, IPasswordHasher<object> hasher)
     {
-        private readonly AppDbContext _context;
-        private readonly PasswordHasher<User> _hasher;
+        _context = context;
+        _hasher = hasher;
+    }
 
-        public AccountController(AppDbContext context)
+    [HttpGet]
+    public IActionResult Login()
+    {
+        return View();
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Login(string email, string password)
+    {
+        var user = _context.Users.FirstOrDefault(u => u.Email == email);
+        if (user == null)
         {
-            _context = context;
-            _hasher = new PasswordHasher<User>();
-        }
-
-        // GET: Register
-        public IActionResult Register() => View();
-
-        // POST: Register
-        [HttpPost]
-        public IActionResult Register(string email, string password)
-        {
-            if (_context.Users.Any(u => u.Email == email))
-            {
-                ViewBag.Message = "Email already registered";
-                return View();
-            }
-
-            var user = new User
-            {
-                Email = email
-            };
-            user.PasswordHash = _hasher.HashPassword(user, password);
-
-            _context.Users.Add(user);
-            _context.SaveChanges();
-
-            ViewBag.Message = "Registration successful. Please login.";
+            ViewBag.Error = "Invalid login.";
             return View();
         }
 
-        // GET: Login
-        public IActionResult Login() => View();
-
-        // POST: Login
-        [HttpPost]
-        public IActionResult Login(string email, string password)
+        if (string.IsNullOrEmpty(user.PasswordHash))
         {
-            var user = _context.Users.FirstOrDefault(u => u.Email == email);
-            if (user == null)
-            {
-                ViewBag.Message = "Invalid login.";
-                return View();
-            }
-
-            if (string.IsNullOrEmpty(user.PasswordHash))
-            {
-                ViewBag.Message = "Invalid login.";
-                return View();
-            }
-
-            var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
-            if (result == PasswordVerificationResult.Success)
-            {
-                // Login successful
-                return RedirectToAction("Index", "Home");
-            }
-            else
-            {
-                ViewBag.Message = "Invalid login.";
-                return View();
-            }
+            ViewBag.Error = "Invalid login.";
+            return View();
         }
+
+        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
+        if (result == PasswordVerificationResult.Success)
+        {
+            // ✅ Create claims (user identity)
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Email ?? string.Empty)
+            };
+
+            var claimsIdentity = new ClaimsIdentity(
+                claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true, // stays logged in after browser close
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30) // session timeout
+            };
+
+            // ✅ Sign in
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(claimsIdentity),
+                authProperties);
+
+            return RedirectToAction("Index", "Home");
+        }
+
+        ViewBag.Error = "Invalid login.";
+        return View();
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction("Login", "Account");
     }
 }
