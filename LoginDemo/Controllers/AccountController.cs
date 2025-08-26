@@ -4,13 +4,14 @@ using System.Security.Claims;
 using LoginDemo.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using LoginDemo.Models; // Add this if your User class is in Models namespace
 
 public class AccountController : Controller
 {
     private readonly AppDbContext _context;
-    private readonly IPasswordHasher<object> _hasher;
+    private readonly IPasswordHasher<User> _hasher;
 
-    public AccountController(AppDbContext context, IPasswordHasher<object> hasher)
+    public AccountController(AppDbContext context, IPasswordHasher<User> hasher)
     {
         _context = context;
         _hasher = hasher;
