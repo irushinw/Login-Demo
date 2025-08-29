@@ -23,50 +23,52 @@ public class AccountController : Controller
         return View();
     }
 
+   
+    
     [HttpPost]
-    public async Task<IActionResult> Login(string email, string password)
+public async Task<IActionResult> Login(string email, string password)
+{
+    var user = _context.Users.FirstOrDefault(u => u.Email == email);
+    if (user == null || string.IsNullOrEmpty(user.PasswordHash))
     {
-        var user = _context.Users.FirstOrDefault(u => u.Email == email);
-        if (user == null)
+        // ❌ Redirect to Result page (failed)
+        return RedirectToAction("Result", new { success = false });
+    }
+
+    var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
+    if (result == PasswordVerificationResult.Success)
+    {
+        var claims = new List<Claim>
         {
-            ViewBag.Error = "Invalid login.";
-            return View();
-        }
+            new Claim(ClaimTypes.Name, user.Email ?? string.Empty)
+        };
 
-        if (string.IsNullOrEmpty(user.PasswordHash))
+        var claimsIdentity = new ClaimsIdentity(
+            claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+        var authProperties = new AuthenticationProperties
         {
-            ViewBag.Error = "Invalid login.";
-            return View();
-        }
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+        };
 
-        var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
-        if (result == PasswordVerificationResult.Success)
-        {
-            // ✅ Create claims (user identity)
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Email ?? string.Empty)
-            };
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(claimsIdentity),
+            authProperties);
 
-            var claimsIdentity = new ClaimsIdentity(
-                claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        // ✅ Redirect to Result page (success)
+        return RedirectToAction("Result", new { success = true });
+    }
 
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true, // stays logged in after browser close
-                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30) // session timeout
-            };
+    // ❌ Redirect to Result page (failed)
+    return RedirectToAction("Result", new { success = false });
+}
 
-            // ✅ Sign in
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
-
-            return RedirectToAction("Index", "Home");
-        }
-
-        ViewBag.Error = "Invalid login.";
+    // ✅ New action to show Login Success / Failed
+    public IActionResult Result(bool success)
+    {
+        ViewBag.Message = success ? "✅ Login Successful!" : "❌ Login Failed!";
         return View();
     }
 
