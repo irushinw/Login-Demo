@@ -11,11 +11,11 @@ public class AccountController : Controller
     private readonly AppDbContext _context;
     private readonly IPasswordHasher<User> _hasher;
 
-    // public AccountController(AppDbContext context, IPasswordHasher<User> hasher)
-    // {
-    //     _context = context;
-    //     _hasher = hasher;
-    // }
+     public AccountController(AppDbContext context, IPasswordHasher<User> hasher)
+    {
+        _context = context;
+        _hasher = hasher;
+     }
 
     [HttpGet]
     public IActionResult Login()
