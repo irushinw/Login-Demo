@@ -6,7 +6,7 @@ using LoginDemo.Models; // For User model (adjust if your User class is in a dif
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -38,8 +38,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}");
-
+app.MapControllers();
+    
 app.Run();
